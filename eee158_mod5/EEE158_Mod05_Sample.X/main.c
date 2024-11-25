@@ -64,14 +64,18 @@ typedef struct prog_state_type
 	uint16_t flags;
 	
 	// Transmit stuff
+    /*
+     * Declares a four element array with the buffer and length of the message.
+     */
 	platform_usart_tx_bufdesc_t tx_desc[4];
+    
 	char tx_buf[64];
-	uint16_t tx_blen;
+	uint16_t tx_blen; // [0, 65535]
 	
 	// Receiver stuff
-	platform_usart_rx_async_desc_t rx_desc;
+	platform_usart_rx_async_desc_t rx_desc; // Buffer, length, type of completion; if applicable, completion info
 	uint16_t rx_desc_blen;
-	char rx_desc_buf[16];
+	char rx_desc_buf[16]; 
 } prog_state_t;
 
 /*
