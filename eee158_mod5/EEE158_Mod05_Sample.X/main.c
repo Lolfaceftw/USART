@@ -37,9 +37,19 @@ static const char banner_msg[] =
 "+--------------------------------------------------------------------+\r\n"
 "\r\n"
 "Last-pressed key sequence (hex dump): <None> \r\n";
+// \033[ Control Sequence Introducer
+// 0m (SGR) Resets all text attributes
+// 2J (ED)Clear entire screen
+// 1;1H (CUP) Moves cursor to row 1 column 1
 
 static const char ESC_SEQ_KEYP_LINE[] = "\033[11;39H\033[0K";
+// \033[ Control Sequence
+// 11;39H (CUP) Moves cursor to row 11 column 39
+// 0K (EL) Clear from cursor to end of line
+
 static const char ESC_SEQ_IDLE_INF[]  = "\033[12;1H";
+// \033[ Control Sequence
+// 12;1H (CUP) Moves cursor to row 12 column 1
 
 //////////////////////////////////////////////////////////////////////////////
 
