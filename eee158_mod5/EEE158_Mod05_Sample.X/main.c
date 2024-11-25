@@ -59,7 +59,8 @@ typedef struct prog_state_type
 	// Flags for this program
 #define PROG_FLAG_BANNER_PENDING	0x0001	// Waiting to transmit the banner
 #define PROG_FLAG_UPDATE_PENDING	0x0002	// Waiting to transmit updates
-#define PROG_FLAG_GEN_COMPLETE		0x8000	// Message generation has been done, but transmission has not occurred
+#define PROG_FLAG_GEN_COMPLETE		0x8000	// Message generation has been done, but transmission has not occurred; 32768; 2**15
+
 	uint16_t flags;
 	
 	// Transmit stuff
