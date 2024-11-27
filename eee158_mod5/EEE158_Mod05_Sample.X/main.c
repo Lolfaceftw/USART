@@ -37,9 +37,19 @@ static const char banner_msg[] =
 "+--------------------------------------------------------------------+\r\n"
 "\r\n"
 "Last-pressed key sequence (hex dump): <None> \r\n";
+// \033[ Control Sequence Introducer
+// 0m (SGR) Resets all text attributes
+// 2J (ED)Clear entire screen
+// 1;1H (CUP) Moves cursor to row 1 column 1
 
 static const char ESC_SEQ_KEYP_LINE[] = "\033[11;39H\033[0K";
+// \033[ Control Sequence
+// 11;39H (CUP) Moves cursor to row 11 column 39
+// 0K (EL) Clear from cursor to end of line
+
 static const char ESC_SEQ_IDLE_INF[]  = "\033[12;1H";
+// \033[ Control Sequence
+// 12;1H (CUP) Moves cursor to row 12 column 1
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -49,18 +59,23 @@ typedef struct prog_state_type
 	// Flags for this program
 #define PROG_FLAG_BANNER_PENDING	0x0001	// Waiting to transmit the banner
 #define PROG_FLAG_UPDATE_PENDING	0x0002	// Waiting to transmit updates
-#define PROG_FLAG_GEN_COMPLETE		0x8000	// Message generation has been done, but transmission has not occurred
+#define PROG_FLAG_GEN_COMPLETE		0x8000	// Message generation has been done, but transmission has not occurred; 32768; 2**15
+
 	uint16_t flags;
 	
 	// Transmit stuff
+    /*
+     * Declares a four element array with the buffer and length of the message.
+     */
 	platform_usart_tx_bufdesc_t tx_desc[4];
+    
 	char tx_buf[64];
-	uint16_t tx_blen;
+	uint16_t tx_blen; // [0, 65535]
 	
 	// Receiver stuff
-	platform_usart_rx_async_desc_t rx_desc;
+	platform_usart_rx_async_desc_t rx_desc; // Buffer, length, type of completion; if applicable, completion info
 	uint16_t rx_desc_blen;
-	char rx_desc_buf[16];
+	char rx_desc_buf[16]; 
 } prog_state_t;
 
 /*
