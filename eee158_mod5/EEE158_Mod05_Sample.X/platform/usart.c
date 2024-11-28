@@ -15,8 +15,8 @@
  * 
  * HW configuration for the corresponding Curiosity Nano+ Touch Evaluation
  * Board:
- * -- ???: UART via debugger (TX, SERCOM???, PAD[0])
- * -- ???: UART via debugger (RX, SERCOM???, PAD[1])
+ * -- ???: UART via debugger (TX, SERCOM03, PAD[0]); PB09 PAD[1]
+ * -- ???: UART via debugger (RX, SERCOM03, PAD[1]); PB08 PAD[0]
  */
 
 // Common include for the XC32 compiler
@@ -85,7 +85,7 @@ void platform_usart_init(void)
 	 * To avoid namespace pollution, this macro is #undef'd at the end of
 	 * this function.
 	 */
-#define UART_REGS (&(SERCOM???_REGS->USART_INT))
+#define UART_REGS (&(SERCOM3_REGS->USART_INT))
 	
 	/*
 	 * Enable the APB clock for this peripheral
@@ -95,7 +95,8 @@ void platform_usart_init(void)
 	 * WARNING: Incorrect MCLK settings can cause system lockup that can
 	 *          only be rectified via a hardware reset/power-cycle.
 	 */
-	// MCLK_REGS->MCLK_APB???MASK |= (1 << ???);
+    //18.6
+	MCLK_REGS->MCLK_APBCMASK |= (1 << 4);
 	
 	/*
 	 * Enable the GCLK generator for this peripheral
@@ -103,8 +104,9 @@ void platform_usart_init(void)
 	 * NOTE: GEN2 (4 MHz) is used, as GEN0 (24 MHz) is too fast for our
 	 *       use case.
 	 */
-	GCLK_REGS->GCLK_PCHCTRL[???] = 0x00000042;
-	while ((GCLK_REGS->GCLK_PCHCTRL[???] & 0x00000040) == 0)
+    // 17.7.5
+	GCLK_REGS->GCLK_PCHCTRL[20] = 0x00000042;
+	while ((GCLK_REGS->GCLK_PCHCTRL[20] & 0x00000040) == 0)
 		asm("nop");
 	
 	// Initialize the peripheral's context structure
@@ -118,35 +120,45 @@ void platform_usart_init(void)
 	 *       on operating mode (USART_INT for UART mode). CTRLA is shared
 	 *       across all modes, so set it first after reset.
 	 */
-	UART_REGS->SERCOM_CTRLA = ???;
-	while ((UART_REGS->SERCOM_SYNCBUSY & ???) != 0)
-		asm("nop");
-	UART_REGS->SERCOM_CTRLA = (uint32_t)(???);
-		
+    // 34.7.1: Reset
+	UART_REGS->SERCOM_CTRLA = (1 << 0);
+	while (UART_REGS -> SERCOM_SYNCBUSY & ~(1 << 0))
+        asm("nop");
+    UART_REGS->SERCOM_CTRLA |= (uint32_t)(0x1 << 2); // Internally clocked
 	/*
 	 * Select further settings compatible with the 16550 UART:
 	 * 
-	 * - 16-bit oversampling, arithmetic mode (for noise immunity)
-	 * - LSB first
-	 * - No parity
-	 * - Two stop bits
-	 * - 8-bit character size
-	 * - No break detection
+	 * - x16-bit oversampling, arithmetic mode (for noise immunity)
+	 * - xLSB first
+	 * - xNo parity
+	 * - xTwo stop bits
+	 * - x8-bit character size
+	 * - xNo break detection
 	 * 
-	 * - Use PAD[0] for data transmission
-	 * - Use PAD[1] for data reception
+	 * - xUse PAD[0] for data transmission
+	 * - xUse PAD[1] for data reception
 	 * 
 	 * NOTE: If a control register is not used, comment it out.
 	 */
-	UART_REGS->SERCOM_CTRLA |= ???;
-	UART_REGS->SERCOM_CTRLB |= ???;
-	UART_REGS->SERCOM_CTRLC |= ???;
+    // 34.7.1
+    
+    UART_REGS->SERCOM_CTRLA |= (0x0 << 24); // USART frame w/o parity
+	UART_REGS->SERCOM_CTRLA |= (1 << 30); // LSB First
+    UART_REGS->SERCOM_CTRLA |= (0x0 << 13); // 16 bit oversampling, arithmetic
+    UART_REGS->SERCOM_CTRLA |= (0x0 << 16); // PAD[0] Tx
+    UART_REGS->SERCOM_CTRLA |= (0x1 << 20); // PAD[1] Rx
+    UART_REGS->SERCOM_CTRLB |= (0 << 8); // No collision detection
+    UART_REGS->SERCOM_CTRLB |= (1 << 6); // 2 stop bits
+    UART_REGS->SERCOM_CTRLB |= (0x0 << 0); // 8 bits
+    UART_REGS->SERCOM_CTRLC |= (0 << 27); // FIFO disabled
+
 	
 	/*
 	 * This value is determined from f_{GCLK} and f_{baud}, the latter
 	 * being the actual target baudrate (here, 38400 bps).
 	 */
-	UART_REGS->SERCOM_BAUD = ???;
+    // (4e6/16)(1-(2^8/2^16))
+	UART_REGS->SERCOM_BAUD = 0x3CCBF; //249023
 	
 	/*
 	 * Configure the IDLE timeout, which should be the length of 3
@@ -156,8 +168,10 @@ void platform_usart_init(void)
 	 *       and stop bits); add one bit for margin purposes. In addition,
 	 *       for UART one baud period corresponds to one bit.
 	 */
-	ctx_uart.cfg.ts_idle_timeout.nr_sec  = ???;
-	ctx_uart.cfg.ts_idle_timeout.nr_nsec = ???;
+    // Start bit - 1; stop bits - 2; 8 bits/char; 1 bit margin; 12 bits total
+    // 12*3 = 36 / baud rate = 937500 nano seconds
+	ctx_uart.cfg.ts_idle_timeout.nr_sec  = 0;
+	ctx_uart.cfg.ts_idle_timeout.nr_nsec = 0xE4E1C;
 	
 	/*
 	 * Third-to-the-last setup:
@@ -165,8 +179,8 @@ void platform_usart_init(void)
 	 * - Enable receiver and transmitter
 	 * - Clear the FIFOs (even though they're disabled)
 	 */
-	UART_REGS->SERCOM_CTRL??? |= ???;
-	while ((UART_REGS->SERCOM_SYNCBUSY & ???) != 0)
+	UART_REGS->SERCOM_CTRLB = ((0x3 << 22) | (1 << 17) | (1 << 16));
+	while (UART_REGS -> SERCOM_SYNCBUSY & ~(1 << 0))
 		asm("nop");
 	
 	/*
@@ -175,11 +189,19 @@ void platform_usart_init(void)
 	 * NOTE: Consult both the chip and board datasheets to determine the
 	 *       correct port pins to use.
 	 */
-	// <insert code here>
+	// D Peripheral for SERCOM
+    // PB 08 rx; dir 0 INEN 1 PULLEN 0 OUT X
+    PORT_SEC_REGS -> GROUP[1].PORT_DIRCLR |= (8 << 1);
+    PORT_SEC_REGS -> GROUP[1].PORT_PINCFG[8] |= (0x3 << 0);
+    PORT_SEC_REGS -> GROUP[1].PORT_PMUX[4] |= (0x3 << 0);
+    // PB 09 tx; dir 1 inen 1 pullen x out x
+    PORT_SEC_REGS -> GROUP[1].PORT_DIRSET |= (9 << 1);
+    PORT_SEC_REGS -> GROUP[1].PORT_PINCFG[9] |= (0x3 << 0);
+    PORT_SEC_REGS -> GROUP[1].PORT_PMUX[4] |= (0x3 << 1);
 	
 	// Last: enable the peripheral, after resetting the state machine
-	UART_REGS->SERCOM_CTRL??? |= ???;
-	while ((UART_REGS->SERCOM_SYNCBUSY & ???) != 0)
+	UART_REGS->SERCOM_CTRLA |= (1 << 1);
+	while (UART_REGS -> SERCOM_SYNCBUSY & ~(1 << 0))
 		asm("nop");
 	return;
 
