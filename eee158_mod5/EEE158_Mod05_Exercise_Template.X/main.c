@@ -1,9 +1,11 @@
-/*
- * This file contains no code, just comments.
- * 
- * You are expected to replace the contents of this file with your solution,
- * starting with the sample code. This exercise is NOT meant to be done fully
- * from scratch.
- * 
- * - EEE 158 Handlers
- */
+// XC32 Includes
+#include <xc.h>
+#include <stdbool.h>
+#include <string.h>
+
+/* Platform Include */
+#include "platform.h"
+
+int main(){
+    return 0;
+}

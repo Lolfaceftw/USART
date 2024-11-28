@@ -325,6 +325,7 @@ void platform_init(void)
 	return;
 }
 
+
 // Do a single event loop
 void platform_do_loop_one(void)
 {
