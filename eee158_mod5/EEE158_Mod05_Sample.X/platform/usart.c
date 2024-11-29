@@ -180,7 +180,7 @@ void platform_usart_init(void) {
      * - Clear the FIFOs (even though they're disabled)
      */
     
-    UART_REGS->SERCOM_CTRLB |= (1 << 16) | (3 << 22) | (1 << 17);
+    UART_REGS->SERCOM_CTRLB |= (1 << 16) | (0x3 << 22) | (1 << 17);
 
     while ((UART_REGS->SERCOM_SYNCBUSY & (1 << 2)) != 0);
 
