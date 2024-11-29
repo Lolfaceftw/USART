@@ -203,9 +203,20 @@ static void EVSYS_init(void)
 //////////////////////////////////////////////////////////////////////////////
 
 // Configure any peripheral/s used to effect blinking
+/*
+ * @brief Initializes PA 15 as the output LED with input enabled.  Active-Hi.
+ * PA23 as input. Active-LO
+ */
 static void blink_init(void)
 {
-	// <insert code here>
+    /*PA 15*/
+    // DIR: 1; INEN: 1; PULLEN: X; OUT: X
+    PORT_SEC_REGS->GROUP[0].PORT_OUTSET |= (1 << 15);
+    PORT_SEC_REGS->GROUP[0].PORT_DIRSET |= (1 << 15); // Set as output.
+    // 31.7.14
+    PORT_SEC_REGS->GROUP[0].PORT_PINCFG[15] |= (1 << 1); // Enables INEN 
+    // 31.7.13
+    //PORT_SEC_REGS->GROUP[0].PORT_PMUX[7] |= (0x0 << 4); // A Peripheral for PA23, PMUXO[3:0], required PMUXEN 1
 	return;
 }
 
@@ -245,10 +256,20 @@ static void PB_init(void)
 	 *       wiring. Refer to the top of this source file for each PORT
 	 *       pin assignments.
 	 */
+    /*
 	PORT_SEC_REGS->GROUP[0].PORT_DIRCLR = 0x00800000;
 	PORT_SEC_REGS->GROUP[0].PORT_PINCFG[23] = 0x03;
-	PORT_SEC_REGS->GROUP[0].PORT_PMUX[(23 >> 1)] &= ~(0xF0);
-	
+	PORT_SEC_REGS->GROUP[0].PORT_PMUX[(23 >> 1)] &= ~(0xF0);*/
+    /*PA 23*/
+    
+    // 31.7.1
+    PORT_SEC_REGS->GROUP[0].PORT_DIRCLR |= (1 << 23); // Set as input.
+    // 31.7.14
+    PORT_SEC_REGS->GROUP[0].PORT_PINCFG[23] |= 0x7; // Enables PULLEN, INEN, and PMUXEN, input with pull.
+    // 31.7.6
+    PORT_SEC_REGS->GROUP[0].PORT_OUTSET |= (1 << 0); // Set as internal pull-up.
+    // 31.7.13
+    PORT_SEC_REGS->GROUP[0].PORT_PMUX[11] |= (0x0 << 4); // A Peripheral for PA23, PMUXO[3:0], required PMUXEN 1
 	/*
 	 * Debounce EIC_EXT2, where PA23 is.
 	 * 
