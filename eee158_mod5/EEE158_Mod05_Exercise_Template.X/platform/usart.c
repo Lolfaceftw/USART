@@ -140,12 +140,14 @@ void platform_usart_init(void) {
      * 
      * NOTE: If a control register is not used, comment it out.
      */
+    // For sake of clarity, I still added configurations where their bit position is zero.
     // 34.7.1
     UART_REGS->SERCOM_CTRLA |= (1 << 30); // LSB First
     UART_REGS->SERCOM_CTRLA |= (0x1 << 20); // PAD[1] Rx
-    UART_REGS->SERCOM_CTRLB |= (1 << 6); // 2 stop bits
+    UART_REGS->SERCOM_CTRLB |= (0 << 6); // 1 Stop Bit
     
-    UART_REGS->SERCOM_CTRLA |= (0x0 << 24); // USART frame w/o parity
+    UART_REGS->SERCOM_CTRLA |= (0x1 << 24); // USART frame w/ parity
+    UART_REGS->SERCOM_CTRLB |= (0 << 13); // Even Parity
     UART_REGS->SERCOM_CTRLA |= (0x0 << 13); // 16 bit oversampling, arithmetic
     UART_REGS->SERCOM_CTRLA |= (0x0 << 16); // PAD[0] Tx
     UART_REGS->SERCOM_CTRLB |= (0 << 8); // No collision detection
@@ -155,20 +157,19 @@ void platform_usart_init(void) {
 
     /*
      * This value is determined from f_{GCLK} and f_{baud}, the latter
-     * being the actual target baudrate (here, 38400 bps).
+     * being the actual target baudrate (here, 57600 bps).
      */
-    // SERCOM_BAUD = 65536 (1 - (16*38400)/4e6)
-    UART_REGS->SERCOM_BAUD = 0xD8AE; // 55470
-
+    // SERCOM_BAUD = 65536 (1 - (16*57600)/4e6)
+    UART_REGS->SERCOM_BAUD = 0xC505; // 50437
     /*
      * Configure the IDLE timeout, which should be the length of 3
      * USART characters.
      * 
-     * NOTE: Each character is composed of 11 bits (must include parity
+     * NOTE: Each character is composed of 12 bits (must include parity
      *       and stop bits); add one bit for margin purposes. In addition,
      *       for UART one baud period corresponds to one bit.
      */
-    // start bit - 1; stop bits - 2; 8 bits/char; 1 bit margin; 12 bits total
+    // start bit - 1; stop bits - 1; 8 bits/char; 1 bit margin; 1 parity bit; 12 bits total
 
     ctx_uart.cfg.ts_idle_timeout.nr_sec = 0;
     ctx_uart.cfg.ts_idle_timeout.nr_nsec = 0xE4E1C;
