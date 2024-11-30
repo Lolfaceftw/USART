@@ -30,13 +30,14 @@ static const char banner_msg[] =
 "| EEE 158: Electrical and Electronics Engineering Laboratory V       |\r\n"
 "|          Academic Year 2024-2025, Semester 1                       |\r\n"
 "|                                                                    |\r\n"
-"| Sample: \"Hexdump...\"                                               |\r\n"
+"| Solution: Graded Exercise                                          |\r\n"
 "|                                                                    |\r\n"
 "| Author:  EEE 158 Handlers (Almario, de Villa, Nierva, Sison, Tuso) |\r\n"
 "| Date:    21 Oct 2024                                               |\r\n"
 "+--------------------------------------------------------------------+\r\n"
 "\r\n"
-"Last-pressed key sequence (hex dump): <None> \r\n";
+"On-board button: []\r\n"
+"Blink Setting: []\r\n";
 // \033[ Control Sequence Introducer
 // 0m (SGR) Resets all text attributes
 // 2J (ED)Clear entire screen

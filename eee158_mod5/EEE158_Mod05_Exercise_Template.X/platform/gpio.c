@@ -211,12 +211,10 @@ static void blink_init(void)
 {
     /*PA 15*/
     // DIR: 1; INEN: 1; PULLEN: X; OUT: X
-    PORT_SEC_REGS->GROUP[0].PORT_OUTSET |= (1 << 15);
+    // PORT_SEC_REGS->GROUP[0].PORT_OUTSET |= (1 << 15); // For Debugging
     PORT_SEC_REGS->GROUP[0].PORT_DIRSET |= (1 << 15); // Set as output.
     // 31.7.14
     PORT_SEC_REGS->GROUP[0].PORT_PINCFG[15] |= (1 << 1); // Enables INEN 
-    // 31.7.13
-    //PORT_SEC_REGS->GROUP[0].PORT_PMUX[7] |= (0x0 << 4); // A Peripheral for PA23, PMUXO[3:0], required PMUXEN 1
 	return;
 }
 
