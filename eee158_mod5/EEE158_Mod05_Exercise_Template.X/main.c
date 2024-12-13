@@ -28,9 +28,21 @@
  */
 #define HOME_KEY 0x1B    // ASCII for Home key
 #define CTRL_E 0x05     // ASCII for CTRL+E
-int need_update = 0;
+
 static const char banner_msg[] =
-        "\033[0m\033[2J\033[1;1H"
+        "\033[1;1H"
+        "+--------------------------------------------------------------------+\r\n"
+        "| EEE 158: Electrical and Electronics Engineering Laboratory V       |\r\n"
+        "|          Academic Year 2024-2025, Semester 1                       |\r\n"
+        "|                                                                    |\r\n"
+        "| Solution: Graded Exercise                                          |\r\n"
+        "|                                                                    |\r\n"
+        "| Author:  EEE 158 Handlers (Almario, de Villa, Nierva, Sison, Tuso) |\r\n"
+        "| Date:    21 Oct 2024                                               |\r\n"
+        "+--------------------------------------------------------------------+\r\n"
+        "\r\n";
+static const char init_banner_msg[] =
+        "\033[1;1H"
         "+--------------------------------------------------------------------+\r\n"
         "| EEE 158: Electrical and Electronics Engineering Laboratory V       |\r\n"
         "|          Academic Year 2024-2025, Semester 1                       |\r\n"
@@ -43,23 +55,6 @@ static const char banner_msg[] =
         "\r\n"
         "On-board button: [Released]\r\n"
         "Blink Setting: [   OFF  ]\r\n";
-//"Blink Setting: [   ON   ]\r\n"
-//"Blink Setting: [  SLOW  ]\r\n"
-//"Blink Setting: [ MEDIUM ]\r\n"
-//"Blink Setting: [  FAST  ]\r\n";
-// \033[ Control Sequence Introducer
-// 0m (SGR) Resets all text attributes
-// 2J (ED)Clear entire screen
-// 1;1H (CUP) Moves cursor to row 1 column 1
-
-static const char ESC_SEQ_KEYP_LINE[] = "\033[11;19H\033[0K";
-// \033[ Control Sequence 
-// 11;39H (CUP) Moves cursor to row 11 column 39
-// 0K (EL) Clear from cursor to end of line \033[0K
-
-static const char ESC_SEQ_IDLE_INF[] = "\033[12;17H";
-// \033[ Control Sequence
-// 12;1H (CUP) Moves cursor to row 12 column 1
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -106,28 +101,18 @@ static void prog_setup(prog_state_t *ps) {
     return;
 }
 
-// Blink Settings
-/*
-typedef enum {
-    OFF,
-    SLOW,
-    MEDIUM,
-    FAST,
-    ON,
-    NUM_SETTINGS
-} BlinkSetting;*/
 BlinkSetting currentSetting = OFF;
 
 const char *blinkSettingStrings[NUM_SETTINGS] = {
-    "[   OFF  ]\r\n",
-    "[  SLOW  ]\r\n",
-    "[ MEDIUM ]\r\n",
-    "[  FAST  ]\r\n",
-    "[   ON   ]\r\n"
+    "Blink Setting: [   OFF  ]\r\n",
+    "Blink Setting: [  SLOW  ]\r\n",
+    "Blink Setting: [ MEDIUM ]\r\n",
+    "Blink Setting: [  FAST  ]\r\n",
+    "Blink Setting: [   ON   ]\r\n"
 };
 
 
-static const char CHANGE_MODE[] = "\033[12;16H";
+static const char CHANGE_MODE[] = "\033[12;1H\033[0K";
 
 static void updateBlinkSetting(prog_state_t *ps, bool increase) {
     if (increase && currentSetting < ON) {
@@ -160,9 +145,9 @@ static void updateBlinkSetting(prog_state_t *ps, bool increase) {
  */
 int init = 0;
 // Add these escape sequences at the top with other static constants
-static const char ESC_SEQ_BUTTON_POS[] = "\033[11;19H"; // Position cursor at button state
-static const char BUTTON_PRESSED[] = "Pressed] ";
-static const char BUTTON_RELEASED[] = "Released]";
+static const char ESC_SEQ_BUTTON_POS[] = "\033[11;1H"; // Position cursor at button state
+static const char BUTTON_PRESSED[] = "On-board button: [Pressed] ";
+static const char BUTTON_RELEASED[] = "On-board button: [Released]";
 static char current_banner[sizeof (banner_msg)];
 
 static void prog_loop_one(prog_state_t *ps) {
@@ -173,8 +158,8 @@ static void prog_loop_one(prog_state_t *ps) {
     platform_blink_modify();
     // Print out the banner
     if (init == 0) {
-        ps->tx_desc[0].buf = banner_msg;
-        ps->tx_desc[0].len = sizeof (banner_msg) - 1;
+        ps->tx_desc[0].buf = init_banner_msg;
+        ps->tx_desc[0].len = sizeof (init_banner_msg) - 1;
         platform_usart_cdc_tx_async(&ps->tx_desc[0], 1);
         init = 1;
     }
@@ -198,7 +183,7 @@ static void prog_loop_one(prog_state_t *ps) {
     // Something from the UART?
     if (ps->rx_desc.compl_type == PLATFORM_USART_RX_COMPL_DATA) {
         char received_char = ps->rx_desc_buf[0];
-        
+
         if (received_char == CTRL_E || (received_char == 0x1B && ps -> rx_desc_buf[2] == 0x48)) {
             ps->flags |= PROG_FLAG_BANNER_PENDING;
         } else {
