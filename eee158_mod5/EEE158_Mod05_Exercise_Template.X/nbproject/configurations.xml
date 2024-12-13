@@ -298,6 +298,8 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.ranges" value="0-7ffff"/>
         <property key="poweroptions.powerenable" value="false"/>
+        <property key="programmerToGoFilePath"
+                  value="C:/Users/chris/OneDrive/UPD Docs/III - Electronics Engineering/Academic Units/EEE 158/Module 5/USART/eee158_mod5/EEE158_Mod05_Exercise_Template.X/debug/default/EEE158_Mod05_Exercise_Template_ptg"/>
         <property key="programoptions.eraseb4program" value="true"/>
         <property key="programoptions.preservedataflash" value="false"/>
         <property key="programoptions.preservedataflash.ranges"
