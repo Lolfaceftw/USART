@@ -108,8 +108,7 @@ void platform_usart_init(void) {
      */
     // 17.7.5
     GCLK_REGS->GCLK_PCHCTRL[20] = 0x00000042;
-    while ((GCLK_REGS->GCLK_PCHCTRL[20] & 0x00000040) == 0)
-        asm("nop");
+    while ((GCLK_REGS->GCLK_PCHCTRL[20] & 0x00000040) == 0);
 
     // Initialize the peripheral's context structure
     memset(&ctx_uart, 0, sizeof (ctx_uart));
@@ -124,8 +123,7 @@ void platform_usart_init(void) {
      */
     // 34.7.1: Reset
     UART_REGS->SERCOM_CTRLA = (1 << 0);
-    while ((UART_REGS -> SERCOM_SYNCBUSY & (1 << 0)) != 0)
-        asm("nop");
+    while ((UART_REGS -> SERCOM_SYNCBUSY & (1 << 0)) != 0);
     UART_REGS->SERCOM_CTRLA = (0x1 << 2); // Internally clocked
     /*
      * Select further settings compatible with the 16550 UART:
@@ -182,7 +180,7 @@ void platform_usart_init(void) {
      * - Clear the FIFOs (even though they're disabled)
      */
     
-    UART_REGS->SERCOM_CTRLB |= (1 << 16) | (3 << 22) | (1 << 17);
+    UART_REGS->SERCOM_CTRLB |= (1 << 16) | (0x3 << 22) | (1 << 17);
 
     while ((UART_REGS->SERCOM_SYNCBUSY & (1 << 2)) != 0);
 
@@ -202,8 +200,7 @@ void platform_usart_init(void) {
 
     // Last: enable the peripheral, after resetting the state machine
     UART_REGS->SERCOM_CTRLA |= (1 << 1);
-    while ((UART_REGS -> SERCOM_SYNCBUSY & (1 << 1)) != 0)
-        asm("nop");
+    while ((UART_REGS -> SERCOM_SYNCBUSY & (1 << 1)) != 0);
     return;
 
 #undef UART_REGS
