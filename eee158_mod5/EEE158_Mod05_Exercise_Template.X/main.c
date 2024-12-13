@@ -140,29 +140,6 @@ static void prog_loop_one(prog_state_t *ps) {
             ps->tx_desc[1].len = sizeof (BUTTON_RELEASED) - 1;
             platform_usart_cdc_tx_async(&ps->tx_desc[0], 2);
         }
-        //ps->flags |= PROG_FLAG_BANNER_PENDING;
-        /*
-                    ps->tx_desc[0].buf = ESC_SEQ_KEYP_LINE;
-                    ps->tx_desc[0].len = sizeof (ESC_SEQ_KEYP_LINE) - 1;
-                    ps->tx_desc[2].buf = ESC_SEQ_IDLE_INF;
-                    ps->tx_desc[2].len = sizeof (ESC_SEQ_IDLE_INF) - 1;
-
-                    memset(ps->tx_buf, 0, sizeof (ps->tx_buf));
-
-                    ps->tx_desc[1].len = 0;
-                    ps->tx_desc[1].buf = ps->tx_buf;
-
-                    snprintf(ps->tx_buf,
-                            sizeof (ps->tx_buf)- 1,
-                            "Pressed");
-
-
-
-                    ps->tx_desc[1].len = 32;*/
-
-
-        //ps->flags |= PROG_FLAG_GEN_COMPLETE;
-        //ps->rx_desc_blen = 0;
     }
 
     // Something from the UART?
