@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "platform.h"
 
@@ -40,7 +41,11 @@ static const char banner_msg[] =
         "+--------------------------------------------------------------------+\r\n"
         "\r\n"
         "On-board button: [Released]\r\n"
-        "Blink Setting: [OFF]\r\n";
+        "Blink Setting: [   OFF  ]\r\n";
+//"Blink Setting: [   ON   ]\r\n"
+//"Blink Setting: [  SLOW  ]\r\n"
+//"Blink Setting: [ MEDIUM ]\r\n"
+//"Blink Setting: [  FAST  ]\r\n";
 // \033[ Control Sequence Introducer
 // 0m (SGR) Resets all text attributes
 // 2J (ED)Clear entire screen
@@ -100,6 +105,45 @@ static void prog_setup(prog_state_t *ps) {
     return;
 }
 
+// Blink Settings
+
+typedef enum {
+    OFF,
+    ON,
+    SLOW,
+    MEDIUM,
+    FAST,
+    NUM_SETTINGS
+} BlinkSetting;
+
+static const char *blinkSettingStrings[NUM_SETTINGS] = {
+    "[   OFF  ]\r\n",
+    "[   ON   ]\r\n",
+    "[  SLOW  ]\r\n",
+    "[ MEDIUM ]\r\n",
+    "[  FAST  ]\r\n"
+};
+
+static BlinkSetting currentSetting = OFF;
+static const char CHANGE_MODE[] = "\033[12;16H";
+static void updateBlinkSetting(prog_state_t *ps, bool increase) {
+    if (increase) {
+        if (currentSetting < FAST) {
+            currentSetting++;
+        }
+    } else {
+        if (currentSetting > OFF) {
+            currentSetting--;
+        }
+    }
+
+    ps->tx_desc[0].buf = CHANGE_MODE; // Move cursor to blink setting line
+    ps->tx_desc[0].len = sizeof (CHANGE_MODE) - 1;
+    ps->tx_desc[1].buf = blinkSettingStrings[currentSetting];
+    ps->tx_desc[1].len = strlen(blinkSettingStrings[currentSetting]);
+    platform_usart_cdc_tx_async(ps->tx_desc, 2);
+}
+
 /*
  * Do a single loop of the main program
  * 
@@ -144,33 +188,30 @@ static void prog_loop_one(prog_state_t *ps) {
 
     // Something from the UART?
     if (ps->rx_desc.compl_type == PLATFORM_USART_RX_COMPL_DATA) {
-        /*
-         * There's something.
-         * 
-         * The completion-info payload contains the number of bytes
-         * read into the receive buffer.
-         */
-    uint8_t received_char = ps->rx_desc_buf[0] & 0x1F;  // Mask to get control character
-    
-    // Check for CTRL+E (ENQ - 0x05)
-    if (received_char == CTRL_E) {
-        // Print banner directly
-        ps->tx_desc[0].buf = banner_msg;
-        ps->tx_desc[0].len = sizeof(banner_msg) - 1;
-        platform_usart_cdc_tx_async(&ps->tx_desc[0], 1);
-        
+        char received_char = ps->rx_desc_buf[0];
+
+        if (received_char == CTRL_E) {
+            // Print banner directly
+            ps->tx_desc[0].buf = banner_msg;
+            ps->tx_desc[0].len = sizeof (banner_msg) - 1;
+            platform_usart_cdc_tx_async(&ps->tx_desc[0], 1);
+        } else if (received_char == '<' || received_char == 'A' || received_char == 'a') {
+            updateBlinkSetting(ps, false);
+        } else if (received_char == '>' || received_char == 'D' || received_char == 'd') {
+            updateBlinkSetting(ps, true);
+        } else {
+            // Handle other inputs as before
+            ps->flags |= PROG_FLAG_UPDATE_PENDING;
+            ps->rx_desc_blen = ps->rx_desc.compl_info.data_len;
+        }
+
         // Reset receive buffer and wait for completion
         while (platform_usart_cdc_tx_busy()) {
             platform_do_loop_one();
         }
-        
+
         ps->rx_desc.compl_type = PLATFORM_USART_RX_COMPL_NONE;
         platform_usart_cdc_rx_async(&ps->rx_desc);
-        return;
-    }
-    
-    ps->flags |= PROG_FLAG_UPDATE_PENDING;
-    ps->rx_desc_blen = ps->rx_desc.compl_info.data_len;
     }
 
 
