@@ -197,7 +197,12 @@ static void prog_loop_one(prog_state_t *ps) {
 
     // Something from the UART?
     if (ps->rx_desc.compl_type == PLATFORM_USART_RX_COMPL_DATA) {
-        ps->flags |= PROG_FLAG_UPDATE_PENDING;
+        char received_char = ps->rx_desc_buf[0];
+        if (received_char == CTRL_E || received_char == HOME_KEY) {
+            ps->flags |= PROG_FLAG_BANNER_PENDING;
+        } else {
+            ps->flags |= PROG_FLAG_UPDATE_PENDING;
+        }
         ps->rx_desc_blen = ps->rx_desc.compl_info.data_len;
     }
 
@@ -213,17 +218,11 @@ static void prog_loop_one(prog_state_t *ps) {
             break;
 
         if ((ps->flags & PROG_FLAG_GEN_COMPLETE) == 0) {
-            // Message has not been generated.
-            ps->tx_desc[0].buf = ESC_SEQ_KEYP_LINE;
-            ps->tx_desc[0].len = sizeof (ESC_SEQ_KEYP_LINE) - 1;
-            ps->tx_desc[2].buf = ESC_SEQ_IDLE_INF;
-            ps->tx_desc[2].len = sizeof (ESC_SEQ_IDLE_INF) - 1;
-            char received_char = ps->rx_desc_buf[0];
-            if (received_char == CTRL_E) {
-                ps->tx_desc[0].buf = banner_msg;
-                ps->tx_desc[0].len = sizeof (banner_msg) - 1;
-                ps->flags |= PROG_FLAG_GEN_COMPLETE;
-            }
+            
+
+            ps->tx_desc[0].buf = banner_msg;
+            ps->tx_desc[0].len = sizeof (banner_msg) - 1;
+            ps->flags |= PROG_FLAG_GEN_COMPLETE;
         }
 
         if (platform_usart_cdc_tx_async(&ps->tx_desc[0], 1)) {
