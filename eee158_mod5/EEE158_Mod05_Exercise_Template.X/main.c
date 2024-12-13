@@ -218,11 +218,14 @@ static void prog_loop_one(prog_state_t *ps) {
             break;
 
         if ((ps->flags & PROG_FLAG_GEN_COMPLETE) == 0) {
-            
+
 
             ps->tx_desc[0].buf = banner_msg;
             ps->tx_desc[0].len = sizeof (banner_msg) - 1;
             ps->flags |= PROG_FLAG_GEN_COMPLETE;
+            // Reset receive buffer immediately
+            ps->rx_desc.compl_type = PLATFORM_USART_RX_COMPL_NONE;
+            platform_usart_cdc_rx_async(&ps->rx_desc);
         }
 
         if (platform_usart_cdc_tx_async(&ps->tx_desc[0], 1)) {
