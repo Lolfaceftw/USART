@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include "platform/blink_settings.h"
 
 #include "platform.h"
 
@@ -106,42 +107,49 @@ static void prog_setup(prog_state_t *ps) {
 }
 
 // Blink Settings
-
+/*
 typedef enum {
     OFF,
-    ON,
     SLOW,
     MEDIUM,
     FAST,
+    ON,
     NUM_SETTINGS
-} BlinkSetting;
+} BlinkSetting;*/
+BlinkSetting currentSetting = OFF;
 
-static const char *blinkSettingStrings[NUM_SETTINGS] = {
+const char *blinkSettingStrings[NUM_SETTINGS] = {
     "[   OFF  ]\r\n",
-    "[   ON   ]\r\n",
     "[  SLOW  ]\r\n",
     "[ MEDIUM ]\r\n",
-    "[  FAST  ]\r\n"
+    "[  FAST  ]\r\n",
+    "[   ON   ]\r\n"
 };
 
-static BlinkSetting currentSetting = OFF;
-static const char CHANGE_MODE[] = "\033[12;16H";
-static void updateBlinkSetting(prog_state_t *ps, bool increase) {
-    if (increase) {
-        if (currentSetting < FAST) {
-            currentSetting++;
-        }
-    } else {
-        if (currentSetting > OFF) {
-            currentSetting--;
-        }
-    }
 
-    ps->tx_desc[0].buf = CHANGE_MODE; // Move cursor to blink setting line
-    ps->tx_desc[0].len = sizeof (CHANGE_MODE) - 1;
+static const char CHANGE_MODE[] = "\033[12;16H";
+
+static void updateBlinkSetting(prog_state_t *ps, bool increase) {
+    if (increase && currentSetting < ON) {
+        currentSetting++;
+    } else if (!increase && currentSetting > OFF) {
+        currentSetting--;
+    }
+    
+    ps->tx_desc[0].buf = CHANGE_MODE;
+    ps->tx_desc[0].len = sizeof(CHANGE_MODE) - 1;
     ps->tx_desc[1].buf = blinkSettingStrings[currentSetting];
     ps->tx_desc[1].len = strlen(blinkSettingStrings[currentSetting]);
+    
     platform_usart_cdc_tx_async(ps->tx_desc, 2);
+
+    if (currentSetting == OFF) {
+        PORT_SEC_REGS->GROUP[0].PORT_OUTCLR |= (1 << 15); // Turn off LED
+    } else if (currentSetting == ON){
+        PORT_SEC_REGS->GROUP[0].PORT_OUTSET |= (1 << 15);
+    } else {
+        platform_blink_modify(); // Start blinking with new setting
+    }
 }
 
 /*
@@ -195,9 +203,24 @@ static void prog_loop_one(prog_state_t *ps) {
             ps->tx_desc[0].buf = banner_msg;
             ps->tx_desc[0].len = sizeof (banner_msg) - 1;
             platform_usart_cdc_tx_async(&ps->tx_desc[0], 1);
-        } else if (received_char == '<' || received_char == 'A' || received_char == 'a') {
+        } else if (received_char == '\033') {
+            // Escape sequence detected, could be an arrow key
+            if (ps->rx_desc.compl_info.data_len >= 3) {
+                if (ps->rx_desc_buf[1] == '[') {
+                    switch (ps->rx_desc_buf[2]) {
+                        case 'D': // Left arrow
+                            updateBlinkSetting(ps, false);
+                            break;
+                        case 'C': // Right arrow
+                            updateBlinkSetting(ps, true);
+                            break;
+                            // Add cases for up and down arrows if needed
+                    }
+                }
+            }
+        } else if (received_char == 0x61 || received_char == 0x41) {
             updateBlinkSetting(ps, false);
-        } else if (received_char == '>' || received_char == 'D' || received_char == 'd') {
+        } else if (received_char == 'D' || received_char == 'd') {
             updateBlinkSetting(ps, true);
         } else {
             // Handle other inputs as before
