@@ -4,7 +4,7 @@
 - ~~Home & CTRL+E~~ Fixed v1.4
 
 ## Banner Refresh
-- Won't save current banner state.
+- ~~Won't save current banner state.~~ Fixed v1.5
 
 ## Blinking Functionality
 - ~~Improper handling for blinking, refuses to blink.~~ Fixed v1.3
