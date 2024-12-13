@@ -28,7 +28,7 @@
  */
 #define HOME_KEY 0x1B    // ASCII for Home key
 #define CTRL_E 0x05     // ASCII for CTRL+E
-static char result[] = "test";
+int need_update = 0;
 static const char banner_msg[] =
         "\033[0m\033[2J\033[1;1H"
         "+--------------------------------------------------------------------+\r\n"
@@ -163,6 +163,7 @@ int init = 0;
 static const char ESC_SEQ_BUTTON_POS[] = "\033[11;19H"; // Position cursor at button state
 static const char BUTTON_PRESSED[] = "Pressed] ";
 static const char BUTTON_RELEASED[] = "Released]";
+static char current_banner[sizeof (banner_msg)];
 
 static void prog_loop_one(prog_state_t *ps) {
     uint16_t a = 0, b = 0, c = 0;
@@ -172,7 +173,6 @@ static void prog_loop_one(prog_state_t *ps) {
     platform_blink_modify();
     // Print out the banner
     if (init == 0) {
-        //ps->flags |= PROG_FLAG_BANNER_PENDING;
         ps->tx_desc[0].buf = banner_msg;
         ps->tx_desc[0].len = sizeof (banner_msg) - 1;
         platform_usart_cdc_tx_async(&ps->tx_desc[0], 1);
@@ -197,7 +197,13 @@ static void prog_loop_one(prog_state_t *ps) {
 
     // Something from the UART?
     if (ps->rx_desc.compl_type == PLATFORM_USART_RX_COMPL_DATA) {
-        ps->flags |= PROG_FLAG_UPDATE_PENDING;
+        char received_char = ps->rx_desc_buf[0];
+        
+        if (received_char == CTRL_E || (received_char == 0x1B && ps -> rx_desc_buf[2] == 0x48)) {
+            ps->flags |= PROG_FLAG_BANNER_PENDING;
+        } else {
+            ps->flags |= PROG_FLAG_UPDATE_PENDING;
+        }
         ps->rx_desc_blen = ps->rx_desc.compl_info.data_len;
     }
 
@@ -213,17 +219,14 @@ static void prog_loop_one(prog_state_t *ps) {
             break;
 
         if ((ps->flags & PROG_FLAG_GEN_COMPLETE) == 0) {
-            // Message has not been generated.
-            ps->tx_desc[0].buf = ESC_SEQ_KEYP_LINE;
-            ps->tx_desc[0].len = sizeof (ESC_SEQ_KEYP_LINE) - 1;
-            ps->tx_desc[2].buf = ESC_SEQ_IDLE_INF;
-            ps->tx_desc[2].len = sizeof (ESC_SEQ_IDLE_INF) - 1;
-            char received_char = ps->rx_desc_buf[0];
-            if (received_char == CTRL_E) {
-                ps->tx_desc[0].buf = banner_msg;
-                ps->tx_desc[0].len = sizeof (banner_msg) - 1;
-                ps->flags |= PROG_FLAG_GEN_COMPLETE;
-            }
+
+
+            ps->tx_desc[0].buf = banner_msg;
+            ps->tx_desc[0].len = sizeof (banner_msg) - 1;
+            ps->flags |= PROG_FLAG_GEN_COMPLETE;
+            // Reset receive buffer immediately
+            ps->rx_desc.compl_type = PLATFORM_USART_RX_COMPL_NONE;
+            platform_usart_cdc_rx_async(&ps->rx_desc);
         }
 
         if (platform_usart_cdc_tx_async(&ps->tx_desc[0], 1)) {
@@ -241,26 +244,21 @@ static void prog_loop_one(prog_state_t *ps) {
 
         if ((ps->flags & PROG_FLAG_GEN_COMPLETE) == 0) {
             // Message has not been generated.
-            ps->tx_desc[0].buf = ESC_SEQ_KEYP_LINE;
-            ps->tx_desc[0].len = sizeof (ESC_SEQ_KEYP_LINE) - 1;
-            ps->tx_desc[2].buf = ESC_SEQ_IDLE_INF;
-            ps->tx_desc[2].len = sizeof (ESC_SEQ_IDLE_INF) - 1;
 
             // Echo back the received packet as a hex dump.
             char received_char = ps->rx_desc_buf[0];
             if (received_char == '\033') {
                 // Escape sequence detected, could be an arrow key
-                if (ps->rx_desc.compl_info.data_len >= 3) {
-                    if (ps->rx_desc_buf[1] == '[') {
-                        switch (ps->rx_desc_buf[2]) {
-                            case 'D': // Left arrow
-                                updateBlinkSetting(ps, false);
-                                break;
-                            case 'C': // Right arrow
-                                updateBlinkSetting(ps, true);
-                                break;
-                                // Add cases for up and down arrows if needed
-                        }
+                if (ps->rx_desc_buf[1] == '[') {
+                    switch (ps->rx_desc_buf[2]) {
+                        case 'D': // Left arrow
+                            TC0_REGS -> COUNT16.TC_COUNT = 0;
+                            updateBlinkSetting(ps, false);
+                            break;
+                        case 'C': // Right arrow
+                            TC0_REGS -> COUNT16.TC_COUNT = 0;
+                            updateBlinkSetting(ps, true);
+                            break;
                     }
                 }
             } else if (received_char == 0x61 || received_char == 0x41) {
