@@ -11,6 +11,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
+#include "platform/blink_settings.h"
 
 #include "platform.h"
 
@@ -40,7 +42,11 @@ static const char banner_msg[] =
         "+--------------------------------------------------------------------+\r\n"
         "\r\n"
         "On-board button: [Released]\r\n"
-        "Blink Setting: [OFF]\r\n";
+        "Blink Setting: [   OFF  ]\r\n";
+//"Blink Setting: [   ON   ]\r\n"
+//"Blink Setting: [  SLOW  ]\r\n"
+//"Blink Setting: [ MEDIUM ]\r\n"
+//"Blink Setting: [  FAST  ]\r\n";
 // \033[ Control Sequence Introducer
 // 0m (SGR) Resets all text attributes
 // 2J (ED)Clear entire screen
@@ -100,6 +106,52 @@ static void prog_setup(prog_state_t *ps) {
     return;
 }
 
+// Blink Settings
+/*
+typedef enum {
+    OFF,
+    SLOW,
+    MEDIUM,
+    FAST,
+    ON,
+    NUM_SETTINGS
+} BlinkSetting;*/
+BlinkSetting currentSetting = OFF;
+
+const char *blinkSettingStrings[NUM_SETTINGS] = {
+    "[   OFF  ]\r\n",
+    "[  SLOW  ]\r\n",
+    "[ MEDIUM ]\r\n",
+    "[  FAST  ]\r\n",
+    "[   ON   ]\r\n"
+};
+
+
+static const char CHANGE_MODE[] = "\033[12;16H";
+
+static void updateBlinkSetting(prog_state_t *ps, bool increase) {
+    if (increase && currentSetting < ON) {
+        currentSetting++;
+    } else if (!increase && currentSetting > OFF) {
+        currentSetting--;
+    }
+    
+    ps->tx_desc[0].buf = CHANGE_MODE;
+    ps->tx_desc[0].len = sizeof(CHANGE_MODE) - 1;
+    ps->tx_desc[1].buf = blinkSettingStrings[currentSetting];
+    ps->tx_desc[1].len = strlen(blinkSettingStrings[currentSetting]);
+    
+    platform_usart_cdc_tx_async(ps->tx_desc, 2);
+
+    if (currentSetting == OFF) {
+        PORT_SEC_REGS->GROUP[0].PORT_OUTCLR |= (1 << 15); // Turn off LED
+    } else if (currentSetting == ON){
+        PORT_SEC_REGS->GROUP[0].PORT_OUTSET |= (1 << 15);
+    } else {
+        platform_blink_modify(); // Start blinking with new setting
+    }
+}
+
 /*
  * Do a single loop of the main program
  * 
@@ -140,60 +192,49 @@ static void prog_loop_one(prog_state_t *ps) {
             ps->tx_desc[1].len = sizeof (BUTTON_RELEASED) - 1;
             platform_usart_cdc_tx_async(&ps->tx_desc[0], 2);
         }
-        //ps->flags |= PROG_FLAG_BANNER_PENDING;
-        /*
-                    ps->tx_desc[0].buf = ESC_SEQ_KEYP_LINE;
-                    ps->tx_desc[0].len = sizeof (ESC_SEQ_KEYP_LINE) - 1;
-                    ps->tx_desc[2].buf = ESC_SEQ_IDLE_INF;
-                    ps->tx_desc[2].len = sizeof (ESC_SEQ_IDLE_INF) - 1;
-
-                    memset(ps->tx_buf, 0, sizeof (ps->tx_buf));
-
-                    ps->tx_desc[1].len = 0;
-                    ps->tx_desc[1].buf = ps->tx_buf;
-
-                    snprintf(ps->tx_buf,
-                            sizeof (ps->tx_buf)- 1,
-                            "Pressed");
-
-
-
-                    ps->tx_desc[1].len = 32;*/
-
-
-        //ps->flags |= PROG_FLAG_GEN_COMPLETE;
-        //ps->rx_desc_blen = 0;
     }
 
     // Something from the UART?
     if (ps->rx_desc.compl_type == PLATFORM_USART_RX_COMPL_DATA) {
-        /*
-         * There's something.
-         * 
-         * The completion-info payload contains the number of bytes
-         * read into the receive buffer.
-         */
-    uint8_t received_char = ps->rx_desc_buf[0] & 0x1F;  // Mask to get control character
-    
-    // Check for CTRL+E (ENQ - 0x05)
-    if (received_char == CTRL_E) {
-        // Print banner directly
-        ps->tx_desc[0].buf = banner_msg;
-        ps->tx_desc[0].len = sizeof(banner_msg) - 1;
-        platform_usart_cdc_tx_async(&ps->tx_desc[0], 1);
-        
+        char received_char = ps->rx_desc_buf[0];
+
+        if (received_char == CTRL_E) {
+            // Print banner directly
+            ps->tx_desc[0].buf = banner_msg;
+            ps->tx_desc[0].len = sizeof (banner_msg) - 1;
+            platform_usart_cdc_tx_async(&ps->tx_desc[0], 1);
+        } else if (received_char == '\033') {
+            // Escape sequence detected, could be an arrow key
+            if (ps->rx_desc.compl_info.data_len >= 3) {
+                if (ps->rx_desc_buf[1] == '[') {
+                    switch (ps->rx_desc_buf[2]) {
+                        case 'D': // Left arrow
+                            updateBlinkSetting(ps, false);
+                            break;
+                        case 'C': // Right arrow
+                            updateBlinkSetting(ps, true);
+                            break;
+                            // Add cases for up and down arrows if needed
+                    }
+                }
+            }
+        } else if (received_char == 0x61 || received_char == 0x41) {
+            updateBlinkSetting(ps, false);
+        } else if (received_char == 'D' || received_char == 'd') {
+            updateBlinkSetting(ps, true);
+        } else {
+            // Handle other inputs as before
+            ps->flags |= PROG_FLAG_UPDATE_PENDING;
+            ps->rx_desc_blen = ps->rx_desc.compl_info.data_len;
+        }
+
         // Reset receive buffer and wait for completion
         while (platform_usart_cdc_tx_busy()) {
             platform_do_loop_one();
         }
-        
+
         ps->rx_desc.compl_type = PLATFORM_USART_RX_COMPL_NONE;
         platform_usart_cdc_rx_async(&ps->rx_desc);
-        return;
-    }
-    
-    ps->flags |= PROG_FLAG_UPDATE_PENDING;
-    ps->rx_desc_blen = ps->rx_desc.compl_info.data_len;
     }
 
 

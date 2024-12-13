@@ -72,7 +72,7 @@ extern "C" {
      * 
      * @param[in]	val	New blinking state
      */
-    void platform_blink_modify(uint8_t val);
+    void platform_blink_modify();
 
     //////////////////////////////////////////////////////////////////////////////
 

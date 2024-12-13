@@ -27,6 +27,7 @@
 #include <xc.h>
 #include <stdbool.h>
 #include <string.h>
+#include "blink_settings.h"
 
 #include "../platform.h"
 
@@ -34,7 +35,6 @@
 extern void platform_systick_init(void);
 extern void platform_usart_init(void);
 extern void platform_usart_tick_handler(const platform_timespec_t *tick);
-
 /////////////////////////////////////////////////////////////////////////////
 
 // Enable higher frequencies for higher performance
@@ -217,29 +217,76 @@ static void blink_init(void) {
     return;
 }
 
-int read_count() {
-    // Allow read access of COUNT register
-    // Return back the counter value
-    TC0_REGS -> COUNT16.TC_CTRLBSET = (0x4 << 5);
-    return TC0_REGS -> COUNT16.TC_COUNT; // 39.8.13
+void TC0_Wait(void) {
+    while (!(TC0_REGS->COUNT16.TC_INTFLAG & (1 << 4))) {
+        platform_do_loop_one(); // Handle other tasks while waiting
+    }
 
+    // Clear interrupt flag after waiting
+    TC0_REGS->COUNT16.TC_INTFLAG = (1 << 4);
 }
-
 // Adjust the cycle for the LED
 
-void platform_blink_modify(uint8_t val) {
-    /*
-    if (read_count() < TC0_REGS -> COUNT16.TC_CC[0] / 2) {
-        PORT_SEC_REGS -> GROUP[0].PORT_OUTSET = (1 << 15);
-        PORT_SEC_REGS -> GROUP[0].PORT_OUTCLR = (1 << 1);
+void platform_blink_modify(void) {
+    static bool led_on = false;
+    static bool condition = false;
+    static uint32_t current_period = 0;
+    // Start the timer if it's not running
+    if (!(TC0_REGS->COUNT16.TC_STATUS & TC_STATUS_STOP_Msk)) {
+        TC0_REGS->COUNT16.TC_CTRLA |= TC_CTRLA_ENABLE_Msk;
     }
-    if (read_count() > TC0_REGS -> COUNT16.TC_CC[0] / 2) {
-        PORT_SEC_REGS -> GROUP[0].PORT_OUTCLR = (1 << 15);
-        PORT_SEC_REGS -> GROUP[0].PORT_OUTSET = (1 << 1);
-    }*/
-    return;
-}
+    // Check if timer has completed its count
+    if (TC0_REGS->COUNT16.TC_INTFLAG & TC_INTFLAG_OVF_Msk) {
+        TC0_REGS->COUNT16.TC_INTFLAG = TC_INTFLAG_OVF_Msk;
+        condition = true;
+    }
 
+    if (condition) {
+        switch (currentSetting) {
+            case OFF:
+                PORT_SEC_REGS->GROUP[0].PORT_OUTCLR = (1 << 15);
+                break;
+
+            case SLOW:
+                if (led_on) {
+                    PORT_SEC_REGS->GROUP[0].PORT_OUTCLR = (1 << 15);
+                    TC0_REGS->COUNT16.TC_CC[0] = 42188; // 900ms OFF
+                } else {
+                    PORT_SEC_REGS->GROUP[0].PORT_OUTSET = (1 << 15);
+                    TC0_REGS->COUNT16.TC_CC[0] = 4688; // 100ms ON
+                }
+                led_on = !led_on;
+                break;
+
+            case MEDIUM:
+                if (led_on) {
+                    PORT_SEC_REGS->GROUP[0].PORT_OUTCLR = (1 << 15);
+                    TC0_REGS->COUNT16.TC_CC[0] = 18750; // 400ms OFF
+                } else {
+                    PORT_SEC_REGS->GROUP[0].PORT_OUTSET = (1 << 15);
+                    TC0_REGS->COUNT16.TC_CC[0] = 4688; // 100ms ON
+                }
+                led_on = !led_on;
+                break;
+
+            case FAST:
+                if (led_on) {
+                    PORT_SEC_REGS->GROUP[0].PORT_OUTCLR = (1 << 15);
+                    TC0_REGS->COUNT16.TC_CC[0] = 9375; // 200ms OFF
+                } else {
+                    PORT_SEC_REGS->GROUP[0].PORT_OUTSET = (1 << 15);
+                    TC0_REGS->COUNT16.TC_CC[0] = 4688; // 100ms ON
+                }
+                led_on = !led_on;
+                break;
+
+            case ON:
+                PORT_SEC_REGS->GROUP[0].PORT_OUTSET = (1 << 15);
+                break;
+        }
+        condition = false;
+    }
+}
 //////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -347,7 +394,7 @@ void platform_init(void) {
     EIC_init_early();
 
     // Regular initialization
-    //TC0_Init();
+    TC0_Init();
     PB_init();
     blink_init();
     platform_usart_init();
@@ -361,27 +408,31 @@ void platform_init(void) {
 
 void TC0_Init(void) {
     // Enable the TC0 Bus Clock
-    GCLK_REGS -> GCLK_PCHCTRL[23] = (1 << 6); // Bit 6 Enable
-    while ((GCLK_REGS -> GCLK_PCHCTRL [23] * (1 << 6)) == 0);
+    GCLK_REGS->GCLK_PCHCTRL[23] |= (1 << 6); // Bit 6 Enable
+    while ((GCLK_REGS->GCLK_PCHCTRL[23] & (1 << 6)) == 0);
 
-    // Setting up the TC 0 -> CTRLA Register
-    TC0_REGS -> COUNT16.TC_CTRLA = (1); // Software Reset; Bit 0
-    while (TC0_REGS -> COUNT16.TC_SYNCBUSY & (1));
+    // Software Reset
+    TC0_REGS->COUNT16.TC_CTRLA |= (1);
+    while (TC0_REGS->COUNT16.TC_SYNCBUSY & (1));
 
-    TC0_REGS -> COUNT16.TC_CTRLA = (0x0 << 2); // Set to 16 bit mode; Bit[3:2].
-    TC0_REGS -> COUNT16.TC_CTRLA = (0x1 << 4); // Reset counter on next prescaler clock Bit[5:4]]
-    TC0_REGS -> COUNT16.TC_CTRLA = (0x7 << 8); // Prescaler Factor: 1024 Bit[10:8]]
+    // Configure TC0 for 16-bit mode and reset counter on match
+    TC0_REGS->COUNT16.TC_CTRLA |= (0x0 << 2);
+    TC0_REGS->COUNT16.TC_CTRLA |= (0x1 << 4);
 
-    // Setting up the WAVE Register
-    TC0_REGS -> COUNT16.TC_WAVE = (0x1 << 0); // Use MFRQ Bit [1:0]
+    // Prescaler Factor: 1024
+    TC0_REGS->COUNT16.TC_CTRLA |= (0x7 << 8);
 
-    // Setting the Top Value
-    TC0_REGS -> COUNT16.TC_CC[0] = 0x1E84; // Set CC0 Top Value = 3906*2; 23 39.5 (2s period))
+    // Use MFRQ mode
+    TC0_REGS->COUNT16.TC_WAVE |= (0x1 << 0);
 
+    // Default Top Value for SLOW mode (100ms ON)
+    TC0_REGS->COUNT16.TC_CC[0] = 4688; // Assuming a 48 MHz clock with prescaler of 1024
 
-    TC0_REGS -> COUNT16.TC_CTRLA |= (1 << 1); // Enable TC0 Peripheral Bit 1
-
+    // Enable TC0 Peripheral
+    TC0_REGS->COUNT16.TC_CTRLA |= (1 << 1);
+    while (TC0_REGS->COUNT16.TC_SYNCBUSY & (1 << 1));
 }
+
 // Do a single event loop
 
 void platform_do_loop_one(void) {

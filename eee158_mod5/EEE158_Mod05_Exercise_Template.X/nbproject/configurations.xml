@@ -22,6 +22,7 @@
       <itemPath>platform/systick.c</itemPath>
       <itemPath>platform/usart.c</itemPath>
       <itemPath>main.c</itemPath>
+      <itemPath>platform/blink_settings.h</itemPath>
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
